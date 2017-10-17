@@ -210,6 +210,8 @@ typedef NS_ENUM(NSUInteger, MPWordCountType) {
 @property (strong) NSMenuItem *charNoSpacesMenuItem;
 @property (nonatomic) BOOL needsToUnregister;
 
+@property (strong) NSURL* lastSavedPDFURL;
+
 // Store file content in initializer until nib is loaded.
 @property (copy) NSString *loadedString;
 
@@ -1165,6 +1167,23 @@ static void (^MPGetPreviewLoadingCompletionHandler(MPDocument *doc))()
     [pasteboard writeObjects:@[self.renderer.currentHtml]];
 }
 
+- (IBAction)saveDocument:(id)sender
+{
+    [super saveDocument:sender];
+    if(self.preferences.exportPDFAutomatically) {
+        if (self.lastSavedPDFURL) {
+            NSDictionary *settings = @{
+                                       NSPrintJobDisposition: NSPrintSaveJob,
+                                       NSPrintJobSavingURL: self.lastSavedPDFURL,
+                                       };
+            [self printDocumentWithSettings:settings showPrintPanel:NO delegate:nil
+                           didPrintSelector:NULL contextInfo:NULL];
+        } else {
+            [self exportPdf:sender];
+        }
+    }
+}
+
 - (IBAction)exportHtml:(id)sender
 {
     NSSavePanel *panel = [NSSavePanel savePanel];
@@ -1186,6 +1205,7 @@ static void (^MPGetPreviewLoadingCompletionHandler(MPDocument *doc))()
         BOOL highlighting = controller.highlightingIncluded;
         NSString *html = [self.renderer HTMLForExportWithStyles:styles
                                                    highlighting:highlighting];
+        
         [html writeToURL:panel.URL atomically:NO encoding:NSUTF8StringEncoding
                    error:NULL];
     }];
@@ -1206,6 +1226,8 @@ static void (^MPGetPreviewLoadingCompletionHandler(MPDocument *doc))()
     [panel beginSheetModalForWindow:w completionHandler:^(NSInteger result) {
         if (result != NSFileHandlingPanelOKButton)
             return;
+        
+        self.lastSavedPDFURL = panel.URL;
 
         NSDictionary *settings = @{
             NSPrintJobDisposition: NSPrintSaveJob,
